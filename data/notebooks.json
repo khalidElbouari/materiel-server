@@ -1,0 +1,53 @@
+{
+  "notebooks": {
+    "1765113035516": {
+      "id": "1765113035516",
+      "name": "TEST",
+      "description": "",
+      "createdAt": "2025-12-07T13:10:35.516Z",
+      "documentCount": 0
+    },
+    "1765113043941": {
+      "id": "1765113043941",
+      "name": "SPRING",
+      "description": "",
+      "createdAt": "2025-12-07T13:10:43.941Z",
+      "documentCount": 2
+    },
+    "1765113053014": {
+      "id": "1765113053014",
+      "name": "HELLO",
+      "description": "",
+      "createdAt": "2025-12-07T13:10:53.014Z",
+      "documentCount": 0
+    },
+    "1765456622609": {
+      "id": "1765456622609",
+      "name": "test",
+      "description": "",
+      "createdAt": "2025-12-11T12:37:02.609Z",
+      "documentCount": 0
+    }
+  },
+  "documents": {
+    "1765113035516": [],
+    "1765113043941": [
+      {
+        "id": "1765113065921",
+        "filename": "microservices rag tes.txt",
+        "mimetype": "text/plain",
+        "size": 3181,
+        "uploadedAt": "2025-12-07T13:11:03.683Z"
+      },
+      {
+        "id": "1765121404846",
+        "filename": "microservices rag tes.txt",
+        "mimetype": "text/plain",
+        "size": 3181,
+        "uploadedAt": "2025-12-07T15:30:04.102Z"
+      }
+    ],
+    "1765113053014": [],
+    "1765456622609": []
+  }
+}

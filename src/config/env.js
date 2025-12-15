@@ -9,11 +9,11 @@ if (!process.env.GOOGLE_API_KEY) {
 export const config = {
   port: process.env.PORT || 3000,
   googleApiKey: process.env.GOOGLE_API_KEY,
-  googleTextModel: process.env.GOOGLE_TEXT_MODEL || 'gemini-2.0-flash',
+  googleTextModel: process.env.GOOGLE_TEXT_MODEL || 'gemini-2.5-flash',
   chromaUrl: process.env.CHROMA_URL || 'http://localhost:8000',
   logLevel: process.env.LOG_LEVEL || 'info',
-  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/notebooklm',
+  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/rag-materiel',
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  sessionSecret: process.env.SESSION_SECRET || 'default_session_secret',
+  sessionSecret: process.env.SESSION_SECRET,
 };

@@ -13,6 +13,7 @@ import { connectDB } from './database/connection.js';
 import passport from './services/authService.js';
 import { getCurrentUser } from './middlewares/auth.js';
 import logger from './middlewares/logger.js';
+import vectorStoreDebugRoutes from './routes/vectorStoreDebug.js';
 
 const app = express();
 
@@ -52,6 +53,12 @@ app.use('/api/documents', documentRoutes);
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+// Debug routes - only in development
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/debug', vectorStoreDebugRoutes);
+}
+
 
 // Error handling middleware
 app.use(errorHandler);

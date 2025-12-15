@@ -1,10 +1,11 @@
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { RetrievalQAChain } from 'langchain/chains';
-import { initializeVectorStore, getVectorStore } from './vectorStore.js';
-import { config } from '../config/env.js';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import Document from '../database/models/Document.js';
 import logger from '../middlewares/logger.js';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { RunnablePassthrough } from '@langchain/core/runnables';
+import { getCollection, embeddings, initializeVectorStore } from './vectorStore.js';
+import { config } from '../config/env.js';
 
 const textSplitter = new RecursiveCharacterTextSplitter({
   chunkSize: 1000,
@@ -13,33 +14,38 @@ const textSplitter = new RecursiveCharacterTextSplitter({
 
 export const ingestDocument = async (text, metadata = {}, notebookId, userId, documentId) => {
   try {
-    logger.info(`Starting document ingestion for notebook ${notebookId}, user ${userId}`);
-
-    const vectorStore = await getVectorStore(notebookId);
+    await initializeVectorStore();
+    const collection = await getCollection(notebookId);
 
     // Split text into chunks
-    const baseDocs = await textSplitter.createDocuments([text]);
+    const docs = await textSplitter.createDocuments([text]);
 
-    // Create enriched metadata for each chunk
-    const docs = baseDocs.map((doc, index) => ({
-      ...doc,
-      metadata: {
-        ...doc.metadata,
-        notebookId,
-        userId,
-        documentId,
-        chunkId: `chunk_${documentId}_${index}`,
-        pageContent: doc.pageContent,
-      },
+    // Generate embeddings for all chunks
+    const texts = docs.map(doc => doc.pageContent);
+    const embeddingVectors = await embeddings.embedDocuments(texts);
+
+    // Prepare data for ChromaDB
+    const ids = docs.map((_, index) => `${documentId}_chunk_${index}`);
+    const metadatas = docs.map((doc, index) => ({
+      ...metadata,
+      notebookId,
+      userId,
+      documentId,
+      chunkId: `chunk_${documentId}_${index}`,
+      text: doc.pageContent, // Store text in metadata for retrieval
     }));
 
-    // Add to vector store
-    await vectorStore.addDocuments(docs);
+    // Add to ChromaDB
+    await collection.add({
+      ids,
+      embeddings: embeddingVectors,
+      metadatas,
+      documents: texts,
+    });
 
-    // Update document in MongoDB with chunk count
     await Document.findByIdAndUpdate(documentId, { chunkCount: docs.length });
 
-    logger.info(`Document ingested successfully for notebook ${notebookId}. Chunks: ${docs.length}`);
+    logger.info(`Document ingested successfully. Chunks: ${docs.length}`);
     return { success: true, chunks: docs.length };
   } catch (error) {
     logger.error('Error ingesting document:', error);
@@ -49,41 +55,57 @@ export const ingestDocument = async (text, metadata = {}, notebookId, userId, do
 
 export const queryDocuments = async (query, notebookId, userId) => {
   try {
-    logger.info(`Processing query for notebook ${notebookId}, user ${userId}: ${query}`);
+    if (!query || !query.trim()) throw new Error('Query cannot be empty.');
+    if (!config.googleApiKey) throw new Error('GOOGLE_API_KEY is undefined.');
+    if (!config.googleTextModel) throw new Error('GOOGLE_TEXT_MODEL is undefined.');
 
-    const vectorStore = await getVectorStore(notebookId);
+    await initializeVectorStore();
+    const collection = await getCollection(notebookId);
 
-    // Create retriever
-    const retriever = vectorStore.asRetriever({ k: 4 });
+    // Generate query embedding
+    const queryEmbedding = await embeddings.embedQuery(query);
 
-    // --- Vérification des variables d'environnement ---
-    if (!config.googleApiKey) {
-      throw new Error('GOOGLE_API_KEY is undefined. Check your .env file.');
-    }
+    // Search in ChromaDB
+    const results = await collection.query({
+      queryEmbeddings: [queryEmbedding],
+      nResults: 4,
+    });
 
-    // Vérification et fallback du modèle
-const modelName = String(config.googleTextModel || 'gemini-2.0-flash');
-logger.info('Using Google model:', modelName);
+    // Extract documents from results
+    const docs = results.documents[0].map((doc, index) => ({
+      pageContent: doc,
+      metadata: results.metadatas[0][index],
+    }));
 
-    // --- Créer le LLM de manière sûre ---
-const llm = new ChatGoogleGenerativeAI({
-  apiKey: String(config.googleApiKey),
-  modelName,
-  temperature: 0,
-  verbose: true,
-  maxOutputTokens: 1024,
-});
+    // Combine context
+    const contextText = docs.map(doc => doc.pageContent).join('\n\n');
 
-    logger.info('ChatGoogleGenerativeAI instance created successfully.');
+    // Initialize LLM
+    const llm = new ChatGoogleGenerativeAI({
+      apiKey: String(config.googleApiKey),
+      model: config.googleTextModel ?? 'gemini-2.5-flash',
+      temperature: 0.1,
+      maxOutputTokens: 1024,
+    });
 
-    // Create QA chain
-    const chain = RetrievalQAChain.fromLLM(llm, retriever);
+    // Prompt template
+    const prompt = ChatPromptTemplate.fromTemplate(`
+Answer the question based on the following context:
 
-    // Get answer
-    const result = await chain.call({ query });
+{context}
 
-    logger.info(`Query processed successfully for notebook ${notebookId}`);
-    return result;
+Question: {question}
+`);
+
+    const chain = RunnablePassthrough.assign({
+      context: async () => contextText,
+    })
+      .pipe(prompt)
+      .pipe(llm);
+
+    const response = await chain.invoke({ question: query });
+
+    return { answer: response.content, sourceDocuments: docs };
   } catch (error) {
     logger.error('Error querying documents:', error);
     throw error;

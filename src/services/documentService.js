@@ -6,6 +6,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { RunnablePassthrough } from '@langchain/core/runnables';
 import { getCollection, embeddings, initializeVectorStore } from './vectorStore.js';
 import { config } from '../config/env.js';
+import { StringOutputParser } from '@langchain/core/output_parsers';
 
 const textSplitter = new RecursiveCharacterTextSplitter({
   chunkSize: 1000,
@@ -53,6 +54,7 @@ export const ingestDocument = async (text, metadata = {}, notebookId, userId, do
   }
 };
 
+
 export const queryDocuments = async (query, notebookId, userId) => {
   try {
     if (!query || !query.trim()) throw new Error('Query cannot be empty.');
@@ -85,27 +87,35 @@ export const queryDocuments = async (query, notebookId, userId) => {
       apiKey: String(config.googleApiKey),
       model: config.googleTextModel ?? 'gemini-2.5-flash',
       temperature: 0.1,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048,
     });
 
     // Prompt template
     const prompt = ChatPromptTemplate.fromTemplate(`
-Answer the question based on the following context:
+          Answer the question based on the following context:
 
-{context}
+          {context}
 
-Question: {question}
-`);
+          Question: {question}
+
+          Please provide a deteiled answer.
+          `);
 
     const chain = RunnablePassthrough.assign({
       context: async () => contextText,
     })
       .pipe(prompt)
-      .pipe(llm);
+      .pipe(llm)
+      .pipe(new StringOutputParser()); 
 
-    const response = await chain.invoke({ question: query });
+    const answerText = await chain.invoke({ question: query });
 
-    return { answer: response.content, sourceDocuments: docs };
+    logger.info(`Query answered. Response length: ${answerText.length} chars`);
+
+    return { 
+      answer: answerText, 
+      sourceDocuments: docs 
+    };
   } catch (error) {
     logger.error('Error querying documents:', error);
     throw error;

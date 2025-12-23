@@ -82,7 +82,7 @@ export const queryDocument = async (req, res, next) => {
 
     res.json({
       query,
-      answer: result.text,
+      answer: result.answer,
       sourceDocuments: result.sourceDocuments?.map(doc => ({
         content: doc.pageContent,
         metadata: doc.metadata,

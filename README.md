@@ -2,6 +2,20 @@
 
 A Node.js Express server that provides document upload and question-answering capabilities using LangChain, Google Gemini, and ChromaDB vector storage.
 
+## Demo
+
+[Watch the project video](https://drive.google.com/file/d/1em5Wt8vJrWYTh_oq11Gfx6isRHGyab0R/view?usp=drive_link)
+
+## Architecture
+
+- **Controllers**: Handle HTTP requests and responses
+- **Services**: Contain business logic for document processing and LangChain operations
+- **Vector Store**: ChromaDB (with MemoryVectorStore fallback)
+- **Embeddings**: Google Gemini text-embedding-004
+- **LLM**: Google Gemini for question answering
+
+![RAG Application Architecture](rag-application-architecture.png)
+
 ## Features
 
 - **Document Ingestion**: Upload text documents that are automatically chunked, embedded, and stored in vector database
@@ -222,17 +236,7 @@ Currently, no rate limiting is implemented.
         -d '{"query":"Summarize the key points"}' \
         http://localhost:3000/api/documents/query
    ```
-
-## Architecture
-
-- **Controllers**: Handle HTTP requests and responses
-- **Services**: Contain business logic for document processing and LangChain operations
-- **Vector Store**: ChromaDB (with MemoryVectorStore fallback)
-- **Embeddings**: Google Gemini text-embedding-004
-- **LLM**: Google Gemini for question answering
-
 ## Configuration
-
 All configuration is managed through environment variables:
 
 - `PORT`: Server port (default: 3000)
